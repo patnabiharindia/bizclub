@@ -2,7 +2,7 @@ name: Android CI
 
 on:
   push:
-    branches: [ "master" ]   # since your repo uses master
+    branches: [ "master" ]   # change to "main" if your repo uses main
 
 jobs:
   build:
@@ -21,11 +21,35 @@ jobs:
     - name: Grant execute permission for Gradlew
       run: chmod +x ./gradlew
 
+    # 🔹 Build Debug APK
     - name: Build Debug APK
       run: ./gradlew assembleDebug --stacktrace
 
-    - name: Upload APK artifact
-      uses: actions/upload-artifact@v3
+    - name: Upload Debug APK
+      uses: actions/upload-artifact@v4
       with:
         name: MyApp-Debug
-        path: app/build/outputs/apk/debug/*.apk
+        path: app/build/outputs/apk/debug/app-debug.apk
+
+    # 🔹 Prepare Keystore for Release build
+    - name: Decode Keystore
+      run: |
+        echo "$SIGNING_KEY" | base64 --decode > release.keystore
+      shell: bash
+      env:
+        SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
+
+    # 🔹 Build Signed Release APK
+    - name: Build Signed Release APK
+      run: |
+        ./gradlew assembleRelease \
+          -Pandroid.injected.signing.store.file=release.keystore \
+          -Pandroid.injected.signing.store.password=${{ secrets.STORE_PASSWORD }} \
+          -Pandroid.injected.signing.key.alias=${{ secrets.KEY_ALIAS }} \
+          -Pandroid.injected.signing.key.password=${{ secrets.KEY_PASSWORD }}
+
+    - name: Upload Release APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: MyApp-Release
+        path: app/build/outputs/apk/release/app-release.apk
